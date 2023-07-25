@@ -17,6 +17,8 @@ import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.PowerManager;
 import android.os.SystemClock;
+import android.util.Log;
+
 import androidx.annotation.AnyThread;
 import androidx.annotation.MainThread;
 import androidx.annotation.NonNull;
@@ -32,6 +34,8 @@ import java.util.Date;
 @TargetApi(18)
 public abstract class CycledLeScanner {
     public static final long ANDROID_N_MAX_SCAN_DURATION_MILLIS = 30 * 60 * 1000l; // 30 minutes
+    public static final String ACTION_SCAN_RUN = "action_ble_cycle_scan_run";
+    public static final String EXTRA_IS_SUCCESS = "is_success";
     private static final String TAG = "CycledLeScanner";
     private BluetoothAdapter mBluetoothAdapter;
 
@@ -120,6 +124,7 @@ public abstract class CycledLeScanner {
         mScanThread = new HandlerThread("CycledLeScannerThread");
         mScanThread.start();
         mScanHandler = new Handler(mScanThread.getLooper());
+        Log.d("Scannable","scanperiod="+scanPeriod+",betweenScan="+betweenScanPeriod);
     }
 
     public static CycledLeScanner createScanner(Context context, long scanPeriod, long betweenScanPeriod, boolean backgroundFlag, CycledLeScanCallback cycledLeScanCallback, BluetoothCrashResolver crashResolver) {
