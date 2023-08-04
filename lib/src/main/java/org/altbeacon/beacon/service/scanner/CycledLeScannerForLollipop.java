@@ -42,11 +42,13 @@ public class CycledLeScannerForLollipop extends CycledLeScanner {
     private boolean mMainScanCycleActive = false;
     private final BeaconManager mBeaconManager;
     private final PowerManager mPowerManager;
+    private final LocalBroadcastManager mBroadcastManager;
 
     public CycledLeScannerForLollipop(Context context, long scanPeriod, long betweenScanPeriod, boolean backgroundFlag, CycledLeScanCallback cycledLeScanCallback, BluetoothCrashResolver crashResolver) {
         super(context, scanPeriod, betweenScanPeriod, backgroundFlag, cycledLeScanCallback, crashResolver);
         mBeaconManager = BeaconManager.getInstanceForApplication(mContext);
         mPowerManager = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+        mBroadcastManager = LocalBroadcastManager.getInstance(mContext);
     }
 
     @Override
@@ -243,6 +245,13 @@ public class CycledLeScannerForLollipop extends CycledLeScanner {
         mScanningPaused = true;
     }
 
+    private Intent getStatusIntent(boolean isSuccess) {
+        final Intent intent = new Intent();
+        intent.setAction(ACTION_SCAN_RUN);
+        intent.putExtra(EXTRA_IS_SUCCESS, isSuccess);
+        return intent;
+    }
+
     private void postStartLeScan(final List<ScanFilter> filters, final ScanSettings settings) {
         final BluetoothLeScanner scanner = getScanner();
         if (scanner == null) {
@@ -254,24 +263,18 @@ public class CycledLeScannerForLollipop extends CycledLeScanner {
             @WorkerThread
             @Override
             public void run() {
-                final Intent intent = new Intent();
-                intent.setAction(ACTION_SCAN_RUN);
-                intent.putExtra(EXTRA_IS_SUCCESS, false);
-                final LocalBroadcastManager manager = LocalBroadcastManager.getInstance(mContext);
                 try {
                     scanner.startScan(filters, settings, scanCallback);
-                    intent.putExtra(EXTRA_IS_SUCCESS, true);
-                    manager.sendBroadcast(intent);
                 } catch (IllegalStateException e) {
-                    manager.sendBroadcast(intent);
+                    mBroadcastManager.sendBroadcast(getStatusIntent(false));
                     LogManager.w(TAG, "Cannot start scan. Bluetooth may be turned off.");
                 } catch (NullPointerException npe) {
                     // Necessary because of https://code.google.com/p/android/issues/detail?id=160503
-                    manager.sendBroadcast(intent);
+                    mBroadcastManager.sendBroadcast(getStatusIntent(false));
                     LogManager.e(npe, TAG, "Cannot start scan. Unexpected NPE.");
                 } catch (SecurityException e) {
                     // Thrown by Samsung Knox devices if bluetooth access denied for an app
-                    manager.sendBroadcast(intent);
+                    mBroadcastManager.sendBroadcast(getStatusIntent(false));
                     LogManager.e(TAG, "Cannot start scan.  Security Exception: " + e.getMessage(), e);
                 }
             }
@@ -347,6 +350,7 @@ public class CycledLeScannerForLollipop extends CycledLeScanner {
                 @MainThread
                 @Override
                 public void onScanResult(int callbackType, ScanResult scanResult) {
+                    mBroadcastManager.sendBroadcast(getStatusIntent(true));
                     if (LogManager.isVerboseLoggingEnabled()) {
                         LogManager.d(TAG, "got record");
                         List<ParcelUuid> uuids = scanResult.getScanRecord().getServiceUuids();
@@ -368,6 +372,7 @@ public class CycledLeScannerForLollipop extends CycledLeScanner {
                 @Override
                 public void onBatchScanResults(List<ScanResult> results) {
                     LogManager.d(TAG, "got batch records");
+                    mBroadcastManager.sendBroadcast(getStatusIntent(true));
                     for (ScanResult scanResult : results) {
                         mCycledLeScanCallback.onLeScan(scanResult.getDevice(),
                             scanResult.getRssi(), scanResult.getScanRecord().getBytes(),
@@ -381,6 +386,9 @@ public class CycledLeScannerForLollipop extends CycledLeScanner {
                 @MainThread
                 @Override
                 public void onScanFailed(int errorCode) {
+                    if (errorCode != SCAN_FAILED_ALREADY_STARTED) {
+                        mBroadcastManager.sendBroadcast(getStatusIntent(false));
+                    }
                     BluetoothMedic.getInstance().processMedicAction("onScanFailed", errorCode);
                     switch (errorCode) {
                         case SCAN_FAILED_ALREADY_STARTED:
