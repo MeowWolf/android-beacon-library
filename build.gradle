@@ -62,4 +62,3 @@ if (getGradle().getStartParameter().getTaskRequests().toString().contains("relea
         getGradle().getStartParameter().getTaskRequests().toString().contains("closeAndReleaseRepository")) {
     apply plugin: 'io.codearte.nexus-staging'
 }
-
