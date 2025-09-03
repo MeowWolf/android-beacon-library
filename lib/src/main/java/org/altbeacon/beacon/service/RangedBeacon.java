@@ -30,6 +30,10 @@ public class RangedBeacon implements Serializable {
     }
 
     public void updateBeacon(Beacon beacon) {
+        if (beacon == null) {
+            LogManager.w(TAG, "updateBeacon called with null beacon, ignoring");
+            return;
+        }
         packetCount += 1;
         mBeacon = beacon;
         if(firstCycleDetectionTimestamp == 0) {
@@ -53,6 +57,10 @@ public class RangedBeacon implements Serializable {
 
     // Done at the end of each cycle before data are sent to the client
     public void commitMeasurements() {
+        if (mBeacon == null) {
+            LogManager.w(TAG, "commitMeasurements called with null beacon, ignoring");
+            return;
+        }
          if (!getFilter().noMeasurementsAvailable()) {
              double runningAverage = getFilter().calculateRssi();
              mBeacon.setRunningAverageRssi(runningAverage);
